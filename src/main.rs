@@ -1,5 +1,6 @@
 use eframe::egui;
-use crate::gui::pattern_editor::PatternEditor;
+use egui::accesskit::Role::Audio;
+use crate::{core::audioplayer::AudioEngine, gui::pattern_editor::PatternEditor};
 mod gui;
 mod core;
 
@@ -8,6 +9,7 @@ struct RustBerry {
     bpm: i32,
     pattern_editor: PatternEditor,
     show_pattern_editor: bool,
+    audio: AudioEngine
 }
 
 impl Default for RustBerry {
@@ -17,6 +19,7 @@ impl Default for RustBerry {
             bpm: 130,
             pattern_editor: PatternEditor::new(),
             show_pattern_editor: false,
+            audio: AudioEngine::new(404)
         }
     }
 }
@@ -28,6 +31,11 @@ impl eframe::App for RustBerry {
                 let label = if !self.song_playing { "Play" } else { "Stop" };
                 if ui.button(label).clicked() {
                     self.song_playing = !self.song_playing;
+                    if(self.song_playing) {
+                        self.audio.play();
+                    } else {
+                        self.audio.pause();
+                    }
                 }
                 ui.add(
                     egui::DragValue::new(&mut self.bpm)

@@ -14,6 +14,10 @@ impl PatternTrack {
             steps: 16
         }
     }
+
+    pub fn play() {
+        
+    }
 }
 
 pub struct LoopTrack {
