@@ -1,15 +1,14 @@
-use eframe::egui;
-use egui::accesskit::Role::Audio;
 use crate::{core::audioplayer::AudioEngine, gui::pattern_editor::PatternEditor};
-mod gui;
+use eframe::egui;
 mod core;
+mod gui;
 
 struct RustBerry {
     song_playing: bool,
     bpm: i32,
     pattern_editor: PatternEditor,
     show_pattern_editor: bool,
-    audio: AudioEngine
+    audio: AudioEngine,
 }
 
 impl Default for RustBerry {
@@ -19,7 +18,7 @@ impl Default for RustBerry {
             bpm: 130,
             pattern_editor: PatternEditor::new(),
             show_pattern_editor: false,
-            audio: AudioEngine::new(404)
+            audio: AudioEngine::new(),
         }
     }
 }
@@ -32,7 +31,8 @@ impl eframe::App for RustBerry {
                 if ui.button(label).clicked() {
                     self.song_playing = !self.song_playing;
                     if(self.song_playing) {
-                        self.audio.play();
+                        self.audio.play_sound("/home/julianrieder/Desktop/OwnCode/rustberry/rustberry/static/audio_samples/Kick1.wav");
+                        println!("tuff");
                     } else {
                         self.audio.pause();
                     }

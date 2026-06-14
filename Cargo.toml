@@ -8,3 +8,5 @@ eframe = { version = "0.34.3", features = ["default"] }
 egui = "0.34.3"
 winit = "0.30.13"
 cpal = "0.18.1"
+hound = "3.5.1"
+rubato = "3.0.0"
