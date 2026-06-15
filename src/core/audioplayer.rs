@@ -3,95 +3,133 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 use hound::WavReader;
+use ringbuf::{
+    traits::{Consumer, Producer, Split},
+    HeapProd, HeapRb,
+};
 use std::sync::{Arc, Mutex};
 
+pub struct Voice {
+    pub samples: Arc<Vec<f32>>,
+    pub pos: usize,
+    pub channels: usize,
+}
+
 pub struct AudioEngine {
-    device: cpal::Device,
-    config: cpal::SupportedStreamConfig,
-    stream: Option<cpal::Stream>,
+    _stream: cpal::Stream,
+    producer: Mutex<HeapProd<Voice>>,
 }
 
 impl AudioEngine {
     pub fn new() -> Self {
         let host = cpal::default_host();
-        let device = host.default_output_device().expect("no output device");
-        let config = device.default_output_config().unwrap();
-        Self {
-            device,
-            config,
-            stream: None,
-        }
-    }
 
-    pub fn play_sound(&mut self, path: &str) {
-        // drop whatever was playing before
-        self.stream = None;
+        let device = host
+            .default_output_device()
+            .expect("No output device available");
 
-        let mut reader = WavReader::open(path).unwrap();
-        let spec = reader.spec();
-        println!("WAV spec: {:?}", spec);
-        println!("CPAL config: {:?}", self.config);
-        let samples: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Int => reader
-                .samples::<i32>()
-                .map(|s| {
-                    let s = s.unwrap();
-                    let max = (1i64 << (spec.bits_per_sample - 1)) as f32;
-                    s as f32 / max
-                })
-                .collect(),
-            hound::SampleFormat::Float => reader.samples::<f32>().map(|s| s.unwrap()).collect(),
-        };
+        let config = device
+            .default_output_config()
+            .expect("Failed to get default output config");
 
-        let samples = Arc::new(samples);
-        let samples_clone = samples.clone();
-        let pos = Arc::new(Mutex::new(0usize));
-        let pos_clone = pos.clone();
-        let channels = self.config.channels() as usize;
-        let wav_channels = spec.channels as usize;
+        let channels = config.channels() as usize;
+        let stream_config: cpal::StreamConfig = config.into();
 
-        let stream = self
-            .device
+        let rb = HeapRb::<Voice>::new(64);
+        let (producer, mut consumer) = rb.split();
+
+        let mut active: Vec<Voice> = Vec::new();
+
+        let stream = device
             .build_output_stream(
-                self.config.clone().into(),
+                stream_config,
                 move |data: &mut [f32], _| {
-                    let mut pos = pos_clone.lock().unwrap();
+                    while let Some(voice) = consumer.try_pop() {
+                        active.push(voice);
+                    }
+
+                    for sample in data.iter_mut() {
+                        *sample = 0.0;
+                    }
+
                     for frame in data.chunks_mut(channels) {
-                        for ch in 0..channels {
-                            let wav_ch = ch.min(wav_channels - 1);
-                            let idx = *pos * wav_channels + wav_ch;
-                            frame[ch] = if idx < samples_clone.len() {
-                                samples_clone[idx]
-                            } else {
-                                0.0
-                            };
+                        for voice in active.iter_mut() {
+                            for ch in 0..channels {
+                                let wav_ch = ch.min(voice.channels.saturating_sub(1));
+
+                                let idx =
+                                    voice.pos * voice.channels + wav_ch;
+
+                                if idx < voice.samples.len() {
+                                    frame[ch] += voice.samples[idx];
+                                }
+                            }
+
+                            voice.pos += 1;
                         }
-                        *pos += 1;
+
+                        active.retain(|voice| {
+                            voice.pos * voice.channels
+                                < voice.samples.len()
+                        });
                     }
                 },
-                |err| eprintln!("stream error: {err}"),
+                |err| {
+                    eprintln!("Stream error: {err}");
+                },
                 None,
             )
             .unwrap();
 
         stream.play().unwrap();
-        println!("audio shouldve plyyed");
-        self.stream = Some(stream);
-        println!(
-            "stream stored, self.stream is Some: {}",
-            self.stream.is_some()
-        );
+
+        Self {
+            _stream: stream,
+            producer: Mutex::new(producer),
+        }
+    }
+
+    pub fn play_sound(&self, path: &str) {
+        let mut reader = WavReader::open(path)
+            .unwrap_or_else(|e| panic!("Failed to open {path}: {e}"));
+
+        let spec = reader.spec();
+
+        let samples: Vec<f32> = match spec.sample_format {
+            hound::SampleFormat::Int => {
+                let max =
+                    ((1i64 << (spec.bits_per_sample - 1)) - 1) as f32;
+
+                reader
+                    .samples::<i32>()
+                    .map(|s| s.unwrap() as f32 / max)
+                    .collect()
+            }
+
+            hound::SampleFormat::Float => reader
+                .samples::<f32>()
+                .map(|s| s.unwrap())
+                .collect(),
+        };
+
+        let voice = Voice {
+            samples: Arc::new(samples),
+            pos: 0,
+            channels: spec.channels as usize,
+        };
+
+        if let Ok(mut producer) = self.producer.lock() {
+            let _ = producer.try_push(voice);
+        }
     }
 
     pub fn pause(&self) {
-        if let Some(stream) = &self.stream {
-            stream.pause().unwrap();
-        }
+        // TODO
     }
+}
 
-    pub fn resume(&self) {
-        if let Some(stream) = &self.stream {
-            stream.play().unwrap();
-        }
+impl Default for AudioEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

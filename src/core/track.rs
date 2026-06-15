@@ -1,14 +1,16 @@
 pub struct PatternTrack {
     pub name: String,
+    pub path: String,
     pub volume: f32,
     pub pan: f32,
     pub steps: Vec<bool>,
 }
 
 impl PatternTrack {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, path: String) -> Self {
         Self {
             name,
+            path,
             volume: 0f32,
             pan: 0f32,
             steps: vec![false; 16],

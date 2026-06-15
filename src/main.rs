@@ -6,6 +6,7 @@ mod gui;
 struct RustBerry {
     song_playing: bool,
     bpm: i32,
+    pub ms_per_beat: f32,
     pattern_editor: PatternEditor,
     show_pattern_editor: bool,
     audio: AudioEngine,
@@ -13,9 +14,11 @@ struct RustBerry {
 
 impl Default for RustBerry {
     fn default() -> Self {
+        let bpm = 130;
         Self {
             song_playing: false,
             bpm: 130,
+            ms_per_beat: 60000f32 / bpm as f32,
             pattern_editor: PatternEditor::new(),
             show_pattern_editor: false,
             audio: AudioEngine::new(),
