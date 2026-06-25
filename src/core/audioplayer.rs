@@ -9,6 +9,8 @@ use ringbuf::{
 };
 use std::sync::{Arc, Mutex};
 
+use crate::core::sample::Sample;
+
 pub struct Voice {
     pub samples: Arc<Vec<f32>>,
     pub pos: usize,
@@ -89,33 +91,12 @@ impl AudioEngine {
         }
     }
 
-    pub fn play_sound(&self, path: &str) {
-        let mut reader = WavReader::open(path)
-            .unwrap_or_else(|e| panic!("Failed to open {path}: {e}"));
-
-        let spec = reader.spec();
-
-        let samples: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Int => {
-                let max =
-                    ((1i64 << (spec.bits_per_sample - 1)) - 1) as f32;
-
-                reader
-                    .samples::<i32>()
-                    .map(|s| s.unwrap() as f32 / max)
-                    .collect()
-            }
-
-            hound::SampleFormat::Float => reader
-                .samples::<f32>()
-                .map(|s| s.unwrap())
-                .collect(),
-        };
+    pub fn play_sound(&self, sample: Arc<Sample>) {
 
         let voice = Voice {
-            samples: Arc::new(samples),
+            samples: sample.data.clone(),
             pos: 0,
-            channels: spec.channels as usize,
+            channels: sample.channels as usize,
         };
 
         if let Ok(mut producer) = self.producer.lock() {
@@ -124,7 +105,7 @@ impl AudioEngine {
     }
 
     pub fn pause(&self) {
-        // TODO
+        self._stream.pause().unwrap();
     }
 }
 

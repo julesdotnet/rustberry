@@ -1,4 +1,4 @@
-use crate::{core::audioplayer::AudioEngine, gui::pattern_editor::PatternEditor};
+use crate::{core::{audioplayer::AudioEngine, sample_map::init_sample_map, }, gui::pattern_editor::PatternEditor};
 use eframe::egui;
 mod core;
 mod gui;
@@ -28,13 +28,14 @@ impl Default for RustBerry {
 
 impl eframe::App for RustBerry {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+        egui::Panel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let label = if !self.song_playing { "Play" } else { "Stop" };
                 if ui.button(label).clicked() {
                     self.song_playing = !self.song_playing;
                     if(self.song_playing) {
-                        self.audio.play_sound("/home/julianrieder/Desktop/OwnCode/rustberry/rustberry/static/audio_samples/Kick1.wav");
+
+                        //jus play the song idk bru figure it out future juelz
                         println!("tuff");
                     } else {
                         self.audio.pause();
@@ -66,6 +67,9 @@ impl eframe::App for RustBerry {
 }
 
 fn main() -> eframe::Result<()> {
+    init_sample_map();
+
+
     let options = eframe::NativeOptions::default();
     eframe::run_native(
         "Rustberry | v0.0.1",

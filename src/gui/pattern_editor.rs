@@ -1,3 +1,5 @@
+use crate::core::sample::{Sample};
+use crate::core::sample_map::sample_map;
 use crate::core::{
     audioplayer::AudioEngine,
     track::PatternTrack,
@@ -8,12 +10,19 @@ use egui::Color32;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+#[derive(PartialEq)]
+enum PlayState {
+    Playing,
+    Stopped,
+    Paused
+}
+
 pub struct PatternEditor {
     pub tracks: Arc<Mutex<Vec<PatternTrack>>>,
     audio: Arc<AudioEngine>,
     step: usize,
     ms_per_step: f32,
-    playing: bool,
+    state: PlayState,
     receiver: Option<std::sync::mpsc::Receiver<usize>>,
 }
 
@@ -25,35 +34,30 @@ impl PatternEditor {
             tracks: Arc::new(Mutex::new(vec![
                 PatternTrack::new(
                     String::from("Kick1"),
-                    String::from(
-                        "/home/julianrieder/Desktop/OwnCode/rustberry/rustberry/static/audio_samples/Kick1.wav",
-                    ),
+                    sample_map().get("kick1").unwrap(),
                 ),
                 PatternTrack::new(
                     String::from("Kick2"),
-                    String::from(
-                        "/home/julianrieder/Desktop/OwnCode/rustberry/rustberry/static/audio_samples/Zrimshot.wav",
-                    ),
+                    sample_map().get("zrimshot").unwrap(),
                 ),
             ])),
             audio: Arc::new(AudioEngine::new()),
             step: 0,
             ms_per_step: 60000.0 / bpm as f32 / 4.0,
-            playing: false,
+            state: PlayState::Stopped,
             receiver: None,
         }
     }
 
     pub fn play_pattern(&mut self, ms_per_step: f32) {
-        // Prevent multiple sequencer threads.
-        if self.playing {
+        if self.state == PlayState::Playing {
             return;
         }
 
         let (tx, rx) = std::sync::mpsc::channel::<usize>();
 
         self.receiver = Some(rx);
-        self.playing = true;
+        self.state = PlayState::Playing;
 
         let step_duration = std::time::Duration::from_millis(ms_per_step as u64);
 
@@ -67,14 +71,15 @@ impl PatternEditor {
             loop {
                 {
                     if let Ok(tracks) = tracks.lock() {
-                        let paths: Vec<String> = tracks
+                        let paths: Vec<Arc<Sample>> = tracks
                             .iter()
                             .filter(|t| t.steps[step])
-                            .map(|t| t.path.clone())
+                            .map(|t| Arc::clone(&t.sample))
                             .collect();
 
-                        for path in paths {
-                            audio.play_sound(&path);
+                        for sample in paths {
+                            audio.play_sound(sample);
+
                         }
                     }
                 }
@@ -95,6 +100,14 @@ impl PatternEditor {
             }
         });
     }
+
+    pub fn pause_pattern(&mut self) {
+        if self.state == PlayState::Paused {
+            return;
+        }
+        self.state = PlayState::Paused;
+        self.audio.pause();
+    }
 }
 
 impl Default for PatternEditor {
@@ -113,7 +126,13 @@ impl egui::Widget for &mut PatternEditor {
         }
 
         if ui.button("Play Pattern").clicked() {
-            self.play_pattern(self.ms_per_step);
+            if self.state != PlayState::Playing {
+                self.play_pattern(self.ms_per_step);
+            } else {
+                self.state = PlayState::Paused;
+                self.pause_pattern();
+            }
+
         }
 
         let audio = Arc::clone(&self.audio);
@@ -132,7 +151,7 @@ impl egui::Widget for &mut PatternEditor {
                     ui.add(
                         egui::DragValue::new(&mut pattern_track.volume)
                             .speed(0.1)
-                            .clamp_range(-50.0..=50.0)
+                            .range(-50.0..=50.0)
                             .suffix(" dB"),
                     );
 
@@ -156,7 +175,7 @@ impl egui::Widget for &mut PatternEditor {
                             pattern_track.steps[i] = !pattern_track.steps[i];
 
                             if pattern_track.steps[i] {
-                                audio.play_sound(&pattern_track.path);
+                                pattern_track.play();
                             }
                         }
                     }
