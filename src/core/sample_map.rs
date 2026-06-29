@@ -6,6 +6,7 @@ use crate::core::sample::Sample;
 static SAMPLE_MAP: OnceLock<Arc<SampleMap>> = OnceLock::new();
 
 pub fn init_sample_map() {
+    print!("Sample map init!");
     if SAMPLE_MAP
         .set(Arc::new(SampleMap::load_default())).is_err() {
             panic!("i am panicking and it is because the of the sample map load default erroring in init sample map")

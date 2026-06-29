@@ -2,7 +2,6 @@ use cpal::{
     self,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use hound::WavReader;
 use ringbuf::{
     traits::{Consumer, Producer, Split},
     HeapProd, HeapRb,

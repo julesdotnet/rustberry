@@ -1,12 +1,13 @@
-use crate::{core::{audioplayer::AudioEngine, sample_map::init_sample_map, }, gui::pattern_editor::PatternEditor};
+use crate::{core::{audioplayer::AudioEngine, sample_map::init_sample_map}, gui::{pattern_editor::PatternEditor, song_editor::SongEditor}};
 use eframe::egui;
 mod core;
 mod gui;
 
 struct RustBerry {
     song_playing: bool,
-    bpm: i32,
+    pub bpm: i32,
     pub ms_per_beat: f32,
+    song_editor: SongEditor,
     pattern_editor: PatternEditor,
     show_pattern_editor: bool,
     audio: AudioEngine,
@@ -19,6 +20,7 @@ impl Default for RustBerry {
             song_playing: false,
             bpm: 130,
             ms_per_beat: 60000f32 / bpm as f32,
+            song_editor: SongEditor::new(),
             pattern_editor: PatternEditor::new(),
             show_pattern_editor: false,
             audio: AudioEngine::new(),
@@ -28,14 +30,12 @@ impl Default for RustBerry {
 
 impl eframe::App for RustBerry {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::Panel::top("toolbar").show(ctx, |ui| {
+        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 let label = if !self.song_playing { "Play" } else { "Stop" };
                 if ui.button(label).clicked() {
                     self.song_playing = !self.song_playing;
-                    if(self.song_playing) {
-
-                        //jus play the song idk bru figure it out future juelz
+                    if self.song_playing {
                         println!("tuff");
                     } else {
                         self.audio.pause();
@@ -54,7 +54,7 @@ impl eframe::App for RustBerry {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |_ui| {});
+        self.song_editor.show(ctx);
 
         egui::Window::new("Pattern Editor")
             .open(&mut self.show_pattern_editor)
@@ -68,8 +68,6 @@ impl eframe::App for RustBerry {
 
 fn main() -> eframe::Result<()> {
     init_sample_map();
-
-
     let options = eframe::NativeOptions::default();
     eframe::run_native(
         "Rustberry | v0.0.1",

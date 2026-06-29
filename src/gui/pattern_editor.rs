@@ -7,6 +7,7 @@ use crate::core::{
 
 use eframe::egui;
 use egui::Color32;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -24,6 +25,7 @@ pub struct PatternEditor {
     ms_per_step: f32,
     state: PlayState,
     receiver: Option<std::sync::mpsc::Receiver<usize>>,
+    stop_flag: Arc<AtomicBool>
 }
 
 impl PatternEditor {
@@ -46,10 +48,14 @@ impl PatternEditor {
             ms_per_step: 60000.0 / bpm as f32 / 4.0,
             state: PlayState::Stopped,
             receiver: None,
+            stop_flag: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub fn play_pattern(&mut self, ms_per_step: f32) {
+        let stop_flag = Arc::clone(&self.stop_flag);
+        stop_flag.store(false, Ordering::SeqCst);
+
         if self.state == PlayState::Playing {
             return;
         }
@@ -134,8 +140,6 @@ impl egui::Widget for &mut PatternEditor {
             }
 
         }
-
-        let audio = Arc::clone(&self.audio);
 
         ui.vertical(|ui| {
             let mut tracks = self.tracks.lock().unwrap();
