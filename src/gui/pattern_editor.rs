@@ -1,7 +1,7 @@
 use crate::core::sample::{Sample};
 use crate::core::sample_map::sample_map;
 use crate::core::{
-    audioplayer::AudioEngine,
+    audio_player::AudioEngine,
     track::PatternTrack,
 };
 
